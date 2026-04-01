@@ -556,7 +556,7 @@ body::after {
 <script>
 // ── CONFIG ───────────────────────────────────────────────────────
 // Switch between webhook-test (canvas open) and webhook (workflow active)
-const WEBHOOK_URL = 'https://nsdivyasingh03.app.n8n.cloud/webhook-test/vegetable-price-check';
+const WEBHOOK_URL = 'https://nsdivyasingh03.app.n8n.cloud/webhook/vegetable-price-check';
 const USE_MOCK    = false;
 // ─────────────────────────────────────────────────────────────────
 
@@ -566,7 +566,6 @@ const APP_LABELS = {
   Zepto:     'Zepto',
   BigBasket: 'BigBasket',
   Swiggy:    'Swiggy Instamart',
-  Minutes:   'Flipkart Minutes',
 };
 
 // Mirrors the n8n node sequence for the live trace log
@@ -753,6 +752,8 @@ async function getLocationAndSend(imageFile, quantity) {
       );
     });
 
+    console.log('LAT:', coords.lat);
+    console.log('LON:', coords.lon);
     return await sendToWebhook({ lat: coords.lat, lon: coords.lon, quantity, imageFile });
   } catch (err) {
     console.log('GPS failed, using fallback', err);
@@ -812,18 +813,7 @@ scanBtn.addEventListener('click', async () => {
 
   // ── LIVE ──────────────────────────────────────────────────────
   try {
-    const fd = new FormData();
-    fd.append('image',    selectedFile);   // → n8n: $binary.image
-    fd.append('location', 'Bengaluru');    // → n8n: $json.body.location
-    fd.append('quantity', qty);            // → n8n: $json.body.quantity (used by Code node)
-
-    const res = await fetch(WEBHOOK_URL, { method: 'POST', body: fd, mode: 'cors' });
-
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try { const e = await res.json(); detail = e.message || detail; } catch(_) {}
-      throw new Error(detail);
-    }
+    const data = await getLocationAndSend(selectedFile, qty);
 
     /*
       n8n Respond to Webhook node returns:
@@ -844,7 +834,6 @@ scanBtn.addEventListener('click', async () => {
         ]
       }
     */
-    const data = await res.json();
 
     clearInterval(traceTimer);
     completeTrace();
