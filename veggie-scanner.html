@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VeggieCheck — AI Price Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c08;
+  --surface: #0e140e;
+  --surface2: #141c14;
+  --surface3: #1a241a;
+  --green: #4ade80;
+  --green-mid: #22c55e;
+  --green-dim: rgba(74,222,128,0.12);
+  --green-glow: rgba(74,222,128,0.06);
+  --amber: #fbbf24;
+  --red: #f87171;
+  --blue: #60a5fa;
+  --text: #e2f0e2;
+  --text2: #a8bca8;
+  --muted: #5a6e5a;
+  --border: #1e2e1e;
+  --border2: #253525;
+  --mono: 'Space Mono', monospace;
+  --body: 'DM Sans', sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: clamp(16px, 4vw, 32px);
+  padding-top: clamp(24px, 6vw, 52px);
+  padding-bottom: clamp(32px, 6vw, 52px);
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 52px 52px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: -30%; left: 50%;
+  transform: translateX(-50%);
+  width: min(700px, 120vw);
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(74,222,128,0.07) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page {
+  width: 100%;
+  max-width: 560px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 4vw, 32px);
+}
+
+/* Header */
+.header { text-align: center; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: clamp(9px, 2vw, 11px);
+  letter-spacing: 3px;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards 0.05s;
+}
+
+.logo {
+  font-size: clamp(34px, 9vw, 54px);
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards 0.15s;
+}
+.logo span { color: var(--green); }
+
+.tagline {
+  margin-top: 10px;
+  color: var(--text2);
+  font-size: clamp(13px, 3vw, 15px);
+  font-weight: 300;
+  line-height: 1.5;
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards 0.25s;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: clamp(20px, 5vw, 32px);
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards 0.35s;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: clamp(32px, 8vw, 52px) 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  background: var(--surface2);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--green);
+  background: var(--green-dim);
+}
+
+.dropzone.has-image {
+  border-color: var(--green);
+  padding: 0;
+  background: #000;
+}
+
+.dropzone input[type="file"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  font-size: 16px;
+}
+
+.drop-icon {
+  width: 52px; height: 52px;
+  margin: 0 auto 14px;
+  background: var(--green-dim);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.drop-icon svg { width: 22px; height: 22px; stroke: var(--green); }
+
+.drop-label { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.drop-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+.drop-hint-mobile {
+  display: none;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--green);
+  font-family: var(--mono);
+  letter-spacing: 1px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .drop-hint-mobile { display: block; }
+  .drop-sub { display: none; }
+}
+
+#preview {
+  display: none;
+  width: 100%;
+  height: clamp(180px, 42vw, 260px);
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* Quantity */
+.qty-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.qty-label {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); letter-spacing: 1px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.qty-select {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 9px 32px 9px 12px;
+  font-family: var(--mono); font-size: 13px;
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a6e5a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.qty-select:focus { outline: 1px solid var(--green); }
+
+/* Detection badge */
+.detection-badge {
+  display: none; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--radius-sm); padding: 12px 16px;
+  font-family: var(--mono); font-size: 12px;
+}
+.detection-badge.visible { display: flex; }
+
+.badge-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  animation: pulse 1.6s ease infinite;
+}
+.badge-dot.dim { background: var(--muted); animation: none; }
+.badge-label { color: var(--muted); }
+.badge-value { color: var(--green); font-weight: 700; margin-left: auto; }
+.badge-value.pending { color: var(--muted); font-weight: 400; }
+
+/* Apps grid */
+.apps-label {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2px; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 10px;
+}
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.app-chip {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--radius-sm); padding: 8px 4px;
+  text-align: center; font-size: 10px; color: var(--muted);
+  font-family: var(--mono); transition: all 0.2s;
+}
+.app-chip.active { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+.app-chip.loading-chip { animation: chipPulse 1.2s ease infinite; }
+.app-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--border2); margin: 0 auto 5px;
+  transition: background 0.2s;
+}
+.app-chip.active .app-dot { background: var(--green); }
+
+/* Button */
+.btn-scan {
+  width: 100%;
+  padding: clamp(14px, 3vw, 18px);
+  background: var(--green); color: #080c08;
+  border: none; border-radius: var(--radius);
+  font-family: var(--body);
+  font-size: clamp(14px, 3vw, 16px);
+  font-weight: 700; letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  position: relative; overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-scan:hover:not(:disabled) { background: #86efac; transform: translateY(-1px); }
+.btn-scan:active:not(:disabled) { transform: translateY(0); }
+.btn-scan:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.btn-inner { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-sub { font-weight: 400; opacity: 0.65; font-size: clamp(11px, 2.5vw, 13px); }
+.loading-bar {
+  display: none;
+  position: absolute; bottom: 0; left: 0;
+  height: 3px; background: rgba(0,0,0,0.25);
+  animation: loadBar 2.4s ease-in-out infinite;
+}
+.btn-scan.loading .loading-bar { display: block; }
+
+/* Pipeline trace */
+.pipeline-trace { display: none; }
+.pipeline-trace.visible { display: block; }
+.trace-label {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 2px; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 10px;
+}
+.trace-steps { display: flex; flex-direction: column; gap: 7px; }
+.trace-step {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+.trace-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border2); flex-shrink: 0;
+  transition: background 0.3s;
+}
+.trace-dot.done   { background: var(--green); }
+.trace-dot.active { background: var(--amber); animation: pulse 1s ease infinite; }
+.trace-dot.error  { background: var(--red); }
+.trace-step.done   { color: var(--text2); }
+.trace-step.active { color: var(--amber); }
+
+/* Status */
+.status-bar {
+  display: none;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--green);
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
+  word-break: break-all;
+}
+.status-bar.visible { display: block; }
+.status-bar.error { border-color: var(--red); color: var(--red); }
+.cursor { animation: blink 1s step-end infinite; }
+
+/* Results */
+.results { display: none; flex-direction: column; border-top: 1px solid var(--border2); padding-top: 20px; }
+.results.visible { display: flex; }
+
+.results-header {
+  display: flex; align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px; gap: 8px; flex-wrap: wrap;
+}
+.results-title {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2px; color: var(--muted); text-transform: uppercase;
+}
+.results-veg { font-size: 13px; font-weight: 600; color: var(--green); }
+
+.price-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+  opacity: 0;
+  animation: fadeUp 0.35s ease forwards;
+}
+.price-row:last-child { border-bottom: none; }
+
+.price-rank {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); text-align: center;
+}
+.price-rank.best { color: var(--green); font-size: 14px; }
+
+.price-app-col { min-width: 0; }
+.price-app-name {
+  font-size: clamp(12px, 3vw, 14px); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.price-app-name a {
+  color: var(--text); text-decoration: none;
+  border-bottom: 1px solid var(--border2);
+  transition: color 0.15s, border-color 0.15s;
+}
+.price-app-name a:hover { color: var(--green); border-color: var(--green); }
+.price-product-name {
+  font-size: 10px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 2px; font-family: var(--mono);
+}
+
+.price-unit {
+  font-size: 10px; color: var(--muted);
+  font-family: var(--mono); white-space: nowrap;
+}
+
+.best-tag {
+  background: var(--green-dim); color: var(--green);
+  border: 1px solid rgba(74,222,128,0.3);
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1px; padding: 3px 7px;
+  border-radius: 20px; text-transform: uppercase; white-space: nowrap;
+}
+
+.price-col { text-align: right; }
+.price-value {
+  font-family: var(--mono);
+  font-size: clamp(14px, 3.5vw, 16px);
+  font-weight: 700; color: var(--text); white-space: nowrap;
+}
+.price-value.best { color: var(--green); }
+.price-per-kg {
+  font-size: 10px; color: var(--muted);
+  font-family: var(--mono); margin-top: 2px;
+}
+
+/* Endpoint note */
+.endpoint-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  word-break: break-all; line-height: 1.5;
+}
+.endpoint-note svg { flex-shrink: 0; margin-top: 1px; }
+.endpoint-note span { color: var(--amber); }
+
+/* Keyframes */
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(10px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform: scale(1); }
+  50%      { opacity:0.4; transform: scale(0.8); }
+}
+@keyframes blink {
+  0%,100% { opacity:1; } 50% { opacity:0; }
+}
+@keyframes loadBar {
+  0%   { left:0; width:0; }
+  45%  { left:0; width:55%; }
+  100% { left:100%; width:0; }
+}
+@keyframes chipPulse {
+  0%,100% { opacity:1; } 50% { opacity:0.4; }
+}
+
+/* Responsive */
+@media (max-width: 380px) {
+  .apps-grid { grid-template-columns: repeat(2, 1fr); }
+  .price-row { grid-template-columns: 22px 1fr auto auto; }
+  .price-per-kg { display: none; }
+  .best-tag { display: none; }
+}
+@media (min-width: 600px) {
+  .page { max-width: 620px; }
+}
+@media (min-width: 900px) {
+  body { justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="header">
+    <div class="eyebrow">n8n automation demo &mdash; AI pipeline</div>
+    <h1 class="logo">Veggie<span>Check</span></h1>
+    <p class="tagline">Scan a vegetable. Get live prices from 4 quick-commerce apps in seconds.</p>
+  </div>
+
+  <div class="card">
+
+    <!-- Drop zone / camera -->
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <div class="drop-icon" id="dropIcon">
+        <svg fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+          <circle cx="12" cy="13" r="3"/>
+        </svg>
+      </div>
+      <div class="drop-label" id="dropLabel">Tap to scan or upload</div>
+      <div class="drop-sub" id="dropSub">Drag &amp; drop &middot; JPG, PNG &middot; max 10MB</div>
+      <div class="drop-hint-mobile" id="dropHintMobile">Tap to open camera</div>
+      <img id="preview" alt="Vegetable preview"/>
+    </div>
+
+    <!-- Quantity -->
+    <div class="qty-row">
+      <span class="qty-label">Target qty</span>
+      <select id="quantity" class="qty-select">
+        <option value="250">250 g</option>
+        <option value="500" selected>500 g</option>
+        <option value="1000">1 kg</option>
+      </select>
+    </div>
+
+    <!-- Detection badge -->
+    <div class="detection-badge" id="detectionBadge">
+      <div class="badge-dot dim" id="badgeDot"></div>
+      <span class="badge-label">Detected vegetable</span>
+      <span class="badge-value pending" id="detectedVeg">&mdash;</span>
+    </div>
+
+    <!-- Apps -->
+    <div>
+      <div class="apps-label">Checking prices on</div>
+      <div class="apps-grid">
+        <div class="app-chip active" id="chip-blinkit"><div class="app-dot"></div>Blinkit</div>
+        <div class="app-chip active" id="chip-zepto"><div class="app-dot"></div>Zepto</div>
+        <div class="app-chip active" id="chip-bigbasket"><div class="app-dot"></div>BigBasket</div>
+        <div class="app-chip active" id="chip-swiggy"><div class="app-dot"></div>Swiggy</div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button class="btn-scan" id="scanBtn" disabled>
+      <div class="btn-inner">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <span>Find best price</span>
+        <span class="btn-sub">&rarr; 4 apps in parallel</span>
+      </div>
+      <div class="loading-bar"></div>
+    </button>
+
+    <!-- Pipeline trace -->
+    <div class="pipeline-trace" id="pipelineTrace">
+      <div class="trace-label">Pipeline log</div>
+      <div class="trace-steps" id="traceSteps"></div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar" id="statusBar">
+      <span id="statusText"></span><span class="cursor">_</span>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+      <div class="results-header">
+        <span class="results-title">Price comparison</span>
+        <span class="results-veg" id="resultsVeg"></span>
+      </div>
+      <div id="priceList"></div>
+    </div>
+
+    <!-- Endpoint note -->
+    <div class="endpoint-note">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px">
+        <path stroke-linecap="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      POST &rarr; <span id="endpointDisplay"></span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────
+// Switch between webhook-test (canvas open) and webhook (workflow active)
+const WEBHOOK_URL = 'https://nsdivyasingh03.app.n8n.cloud/webhook-test/vegetable-price-check';
+const USE_MOCK    = false;
+// ─────────────────────────────────────────────────────────────────
+
+// Maps n8n's platform keys → display names
+const APP_LABELS = {
+  BlinkIt:   'Blinkit',
+  Zepto:     'Zepto',
+  BigBasket: 'BigBasket',
+  Swiggy:    'Swiggy Instamart',
+  Minutes:   'Flipkart Minutes',
+};
+
+// Mirrors the n8n node sequence for the live trace log
+const PIPELINE_STEPS = [
+  { id: 'webhook', label: 'Image received by n8n webhook' },
+  { id: 'vision',  label: 'GPT-4o-mini identifying vegetable' },
+  { id: 'fields',  label: 'Normalising name & quantity' },
+  { id: 'api',     label: 'QuickCommerce API — fetching prices' },
+  { id: 'merge',   label: 'Merging platform results' },
+  { id: 'code',    label: 'Scoring & sorting by best price' },
+  { id: 'respond', label: 'Sending response back to UI' },
+];
+
+// DOM refs
+const $ = id => document.getElementById(id);
+const dropzone        = $('dropzone');
+const fileInput       = $('fileInput');
+const preview         = $('preview');
+const dropIcon        = $('dropIcon');
+const dropLabel       = $('dropLabel');
+const dropSub         = $('dropSub');
+const dropHintMobile  = $('dropHintMobile');
+const scanBtn         = $('scanBtn');
+const detectionBadge  = $('detectionBadge');
+const badgeDot        = $('badgeDot');
+const detectedVeg     = $('detectedVeg');
+const statusBar       = $('statusBar');
+const statusText      = $('statusText');
+const results         = $('results');
+const resultsVeg      = $('resultsVeg');
+const priceList       = $('priceList');
+const pipelineTrace   = $('pipelineTrace');
+const traceSteps      = $('traceSteps');
+const endpointDisplay = $('endpointDisplay');
+const quantitySelect  = $('quantity');
+const chips           = ['chip-blinkit','chip-zepto','chip-bigbasket','chip-swiggy'];
+
+endpointDisplay.textContent = WEBHOOK_URL;
+
+let selectedFile = null;
+let traceIndex   = 0;
+let traceTimer   = null;
+
+// ── File handling ─────────────────────────────────────────────────
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) handleFile(f);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    dropzone.classList.add('has-image');
+    dropIcon.style.display        = 'none';
+    dropLabel.style.display       = 'none';
+    dropSub.style.display         = 'none';
+    dropHintMobile.style.display  = 'none';
+    scanBtn.disabled              = false;
+
+    // Show badge in pending/waiting state
+    detectedVeg.textContent   = '—';
+    detectedVeg.className     = 'badge-value pending';
+    badgeDot.className        = 'badge-dot dim';
+    detectionBadge.classList.add('visible');
+
+    // Reset
+    results.classList.remove('visible');
+    pipelineTrace.classList.remove('visible');
+    statusBar.classList.remove('visible', 'error');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Pipeline trace ────────────────────────────────────────────────
+function buildTrace() {
+  traceSteps.innerHTML = '';
+  PIPELINE_STEPS.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'trace-step';
+    el.id = 'trace-' + s.id;
+    el.innerHTML = `<div class="trace-dot" id="dot-${s.id}"></div><span>${s.label}</span>`;
+    traceSteps.appendChild(el);
+  });
+  pipelineTrace.classList.add('visible');
+}
+
+function advanceTrace() {
+  if (traceIndex >= PIPELINE_STEPS.length) return;
+  if (traceIndex > 0) {
+    const prev = PIPELINE_STEPS[traceIndex - 1];
+    $('dot-' + prev.id).className    = 'trace-dot done';
+    $('trace-' + prev.id).className  = 'trace-step done';
+  }
+  const cur = PIPELINE_STEPS[traceIndex];
+  $('dot-' + cur.id).className   = 'trace-dot active';
+  $('trace-' + cur.id).className = 'trace-step active';
+  traceIndex++;
+}
+
+function completeTrace() {
+  clearInterval(traceTimer);
+  PIPELINE_STEPS.forEach(s => {
+    $('dot-'   + s.id).className = 'trace-dot done';
+    $('trace-' + s.id).className = 'trace-step done';
+  });
+}
+
+function errorTrace() {
+  clearInterval(traceTimer);
+  PIPELINE_STEPS.forEach(s => {
+    const dot = $('dot-' + s.id);
+    if (dot && dot.classList.contains('active')) dot.className = 'trace-dot error';
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function setStatus(msg, isError = false) {
+  statusText.textContent = msg;
+  statusBar.classList.add('visible');
+  statusBar.classList.toggle('error', isError);
+}
+
+const OPENCAGE_API_KEY = 'a0831097896f4490b69434856c420a0a';
+
+async function getLatLonFromPincode(pincode) {
+  const res = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(pincode)}&key=${OPENCAGE_API_KEY}`);
+  const data = await res.json();
+
+  if (!data.results || !data.results.length) {
+    alert('Invalid pincode');
+    throw new Error('No location found');
+  }
+
+  return {
+    lat: data.results[0].geometry.lat,
+    lon: data.results[0].geometry.lng
+  };
+}
+
+async function sendToWebhook({ lat, lon, quantity, imageFile }) {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  formData.append('quantity', quantity);
+  formData.append('lat', lat);
+  formData.append('lon', lon);
+  formData.append('location', `${lat},${lon}`);
+
+  const res = await fetch(WEBHOOK_URL, {
+    method: 'POST',
+    body: formData,
+    mode: 'cors'
+  });
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const e = await res.json(); detail = e.message || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+
+  return res.json();
+}
+
+async function getLocationAndSend(imageFile, quantity) {
+  try {
+    const coords = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        err => reject(err),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+
+    return await sendToWebhook({ lat: coords.lat, lon: coords.lon, quantity, imageFile });
+  } catch (err) {
+    console.log('GPS failed, using fallback', err);
+
+    const pincode = prompt('Enter your pincode:');
+    if (!pincode) {
+      alert('Location required!');
+      throw new Error('Location required');
+    }
+
+    const coords = await getLatLonFromPincode(pincode);
+    return await sendToWebhook({ lat: coords.lat, lon: coords.lon, quantity, imageFile });
+  }
+}
+
+function animateChips(on) {
+  chips.forEach(id => { const el = $(id); if (el) el.classList.toggle('loading-chip', on); });
+}
+
+// ── Scan ──────────────────────────────────────────────────────────
+scanBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  const qty      = Number(quantitySelect.value) || 500;
+  const qtyLabel = quantitySelect.options[quantitySelect.selectedIndex].text;
+
+  scanBtn.disabled = true;
+  scanBtn.classList.add('loading');
+  results.classList.remove('visible');
+  statusBar.classList.remove('error');
+
+  traceIndex = 0;
+  buildTrace();
+  setStatus('Initialising n8n pipeline...');
+
+  // Advance trace every ~1.4s while waiting for the backend
+  traceTimer = setInterval(() => {
+    if (traceIndex < PIPELINE_STEPS.length) advanceTrace();
+  }, 1400);
+  advanceTrace(); // kick off immediately
+
+  animateChips(true);
+
+  // ── MOCK ──────────────────────────────────────────────────────
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, PIPELINE_STEPS.length * 1400 + 400));
+    clearInterval(traceTimer);
+    completeTrace();
+    animateChips(false);
+    setStatus('Pipeline complete ✓');
+    const m = getMockData(qty);
+    renderResults(m.vegetable, qtyLabel, m.results);
+    scanBtn.disabled = false;
+    scanBtn.classList.remove('loading');
+    return;
+  }
+
+  // ── LIVE ──────────────────────────────────────────────────────
+  try {
+    const fd = new FormData();
+    fd.append('image',    selectedFile);   // → n8n: $binary.image
+    fd.append('location', 'Bengaluru');    // → n8n: $json.body.location
+    fd.append('quantity', qty);            // → n8n: $json.body.quantity (used by Code node)
+
+    const res = await fetch(WEBHOOK_URL, { method: 'POST', body: fd, mode: 'cors' });
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { const e = await res.json(); detail = e.message || detail; } catch(_) {}
+      throw new Error(detail);
+    }
+
+    /*
+      n8n Respond to Webhook node returns:
+      {
+        vegetable: "Tomato",          ← from Edit Fields node  ($node["Analyze image"].json[0].content[0].text)
+        quantity:  "500",             ← from Edit Fields node  ($node["Webhook1"].json.body.quantity)
+        results: [                    ← from Code in JavaScript node output items
+          {
+            app:           "BlinkIt",
+            name:          "Fresh Tomato",
+            price:         29,
+            unit:          "500 g",
+            link:          "https://blinkit.com/...",
+            price_per_kg:  58,
+            best:          true
+          },
+          ...
+        ]
+      }
+    */
+    const data = await res.json();
+
+    clearInterval(traceTimer);
+    completeTrace();
+    animateChips(false);
+    setStatus('Pipeline complete ✓');
+
+    const vegName    = data.vegetable || 'Unknown';
+    const priceItems = Array.isArray(data.results) ? data.results : [];
+
+    renderResults(vegName, qtyLabel, priceItems);
+
+  } catch (err) {
+    clearInterval(traceTimer);
+    errorTrace();
+    animateChips(false);
+    setStatus(`${err.message} — is n8n listening?`, true);
+    console.error('[VeggieCheck]', err);
+  }
+
+  scanBtn.disabled = false;
+  scanBtn.classList.remove('loading');
+});
+
+// ── Render ────────────────────────────────────────────────────────
+function renderResults(vegName, qtyLabel, items) {
+  // Update badge with real name from GPT-4o-mini
+  detectedVeg.textContent = vegName;
+  detectedVeg.className   = 'badge-value';
+  badgeDot.className      = 'badge-dot';
+
+  resultsVeg.textContent = `${vegName} · ${qtyLabel}`;
+  priceList.innerHTML    = '';
+
+  if (!items || items.length === 0) {
+    priceList.innerHTML = `
+      <div style="padding:24px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;">
+        No products found for this quantity range.<br>
+        Try selecting a different quantity above.
+      </div>`;
+    results.classList.add('visible');
+    return;
+  }
+
+  // Backend already sorts, but guard just in case
+  const sorted = [...items].sort((a, b) => (a.price ?? 9999) - (b.price ?? 9999));
+
+  sorted.forEach((item, i) => {
+    const appDisplay = APP_LABELS[item.app] || item.app;
+    const isBest     = item.best === true || i === 0;
+    const row        = document.createElement('div');
+    row.className    = 'price-row';
+    row.style.animationDelay = (i * 70) + 'ms';
+
+    const hasLink = item.link && item.link !== '#';
+    const aOpen   = hasLink ? `<a href="${item.link}" target="_blank" rel="noopener">` : '<span>';
+    const aClose  = hasLink ? '</a>' : '</span>';
+
+    row.innerHTML = `
+      <div class="price-rank ${isBest ? 'best' : ''}">${isBest ? '★' : '#' + (i + 1)}</div>
+      <div class="price-app-col">
+        <div class="price-app-name">${aOpen}${appDisplay}${aClose}</div>
+        ${item.name ? `<div class="price-product-name">${item.name}</div>` : ''}
+      </div>
+      <div class="price-unit">${item.unit || ''}</div>
+      ${isBest ? '<div class="best-tag">Best</div>' : '<div></div>'}
+      <div class="price-col">
+        <div class="price-value ${isBest ? 'best' : ''}">&#8377;${item.price}</div>
+        ${item.price_per_kg ? `<div class="price-per-kg">&#8377;${item.price_per_kg}/kg</div>` : ''}
+      </div>`;
+
+    priceList.appendChild(row);
+  });
+
+  results.classList.add('visible');
+
+  // Auto-scroll to results on mobile
+  if (window.innerWidth < 640) {
+    setTimeout(() => results.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+  }
+}
+
+// ── Mock data ─────────────────────────────────────────────────────
+function getMockData(qty) {
+  return {
+    vegetable: 'Tomato',
+    quantity: String(qty),
+    results: [
+      { app:'BlinkIt',   name:'Fresh Tomato',        price:22, unit:`${qty} g`, link:'#', price_per_kg:44, best:true  },
+      { app:'Zepto',     name:'Tomato',               price:25, unit:`${qty} g`, link:'#', price_per_kg:50, best:false },
+      { app:'BigBasket', name:'Fresho Tomato Hybrid', price:27, unit:`${qty} g`, link:'#', price_per_kg:54, best:false },
+      { app:'Swiggy',    name:'Fresh Tomatoes',       price:30, unit:`${qty} g`, link:'#', price_per_kg:60, best:false },
+    ]
+  };
+}
+</script>
+</body>
+</html>
