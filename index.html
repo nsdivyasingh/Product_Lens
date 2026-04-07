@@ -811,29 +811,8 @@ scanBtn.addEventListener('click', async () => {
     return;
   }
 
-  // ── LIVE ──────────────────────────────────────────────────────
   try {
     const data = await getLocationAndSend(selectedFile, qty);
-
-    /*
-      n8n Respond to Webhook node returns:
-      {
-        vegetable: "Tomato",          ← from Edit Fields node  ($node["Analyze image"].json[0].content[0].text)
-        quantity:  "500",             ← from Edit Fields node  ($node["Webhook1"].json.body.quantity)
-        results: [                    ← from Code in JavaScript node output items
-          {
-            app:           "BlinkIt",
-            name:          "Fresh Tomato",
-            price:         29,
-            unit:          "500 g",
-            link:          "https://blinkit.com/...",
-            price_per_kg:  58,
-            best:          true
-          },
-          ...
-        ]
-      }
-    */
 
     clearInterval(traceTimer);
     completeTrace();
@@ -915,19 +894,6 @@ function renderResults(vegName, qtyLabel, items) {
   }
 }
 
-// ── Mock data ─────────────────────────────────────────────────────
-function getMockData(qty) {
-  return {
-    vegetable: 'Tomato',
-    quantity: String(qty),
-    results: [
-      { app:'BlinkIt',   name:'Fresh Tomato',        price:22, unit:`${qty} g`, link:'#', price_per_kg:44, best:true  },
-      { app:'Zepto',     name:'Tomato',               price:25, unit:`${qty} g`, link:'#', price_per_kg:50, best:false },
-      { app:'BigBasket', name:'Fresho Tomato Hybrid', price:27, unit:`${qty} g`, link:'#', price_per_kg:54, best:false },
-      { app:'Swiggy',    name:'Fresh Tomatoes',       price:30, unit:`${qty} g`, link:'#', price_per_kg:60, best:false },
-    ]
-  };
-}
 </script>
 </body>
 </html>
