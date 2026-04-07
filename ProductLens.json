@@ -1,0 +1,369 @@
+{
+  "name": "ProductLens",
+  "nodes": [
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ \n  {\n    vegetable: $node[\"Data Preparation\"].json.vegetable,\n    quantity: $node[\"Data Preparation\"].json.quantity,\n    results: $items(\"Logic Processing\").map(i => i.json)\n  } \n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1328,
+        272
+      ],
+      "id": "c11b7c6a-3dd8-49b6-a75c-eaf9ccead80f",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vegetable-price-check",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        272
+      ],
+      "id": "59862de3-9938-4cb0-91cb-cb76bcfb388d",
+      "name": "Webhook (Entry Point)",
+      "webhookId": "c0db2b38-38c4-42e5-901c-7f99a07158e0"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "Identify the vegetable in this image. Only return the vegetable name.",
+        "inputType": "base64",
+        "binaryPropertyName": "image",
+        "options": {
+          "detail": "auto"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        368,
+        272
+      ],
+      "id": "2fef560f-fe51-412c-8823-7bdfd61e1a54",
+      "name": "AI Processing",
+      "credentials": {
+        "openAiApi": {
+          "id": "x5QNrITcLFahxWM9",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1c4b629-b6a9-464a-b7f8-af4961b789d4",
+              "name": "vegetable",
+              "value": "={{$node[\"AI Processing\"].json[0]?.content[0]?.text}}",
+              "type": "string"
+            },
+            {
+              "id": "9528eb0f-1df7-40f4-a6b3-5189d4319b30",
+              "name": "quantity",
+              "value": "={{$node[\"Webhook (Entry Point)\"].json.body.quantity}}",
+              "type": "string"
+            },
+            {
+              "id": "515741b3-370c-4b74-9918-2b32251160f9",
+              "name": "lat",
+              "value": "={{$node[\"Webhook (Entry Point)\"].json.body.lat}}",
+              "type": "string"
+            },
+            {
+              "id": "97ad1262-97b7-45a0-8b45-85420cbfbcd9",
+              "name": "lon",
+              "value": "={{$node[\"Webhook (Entry Point)\"].json.body.lon}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        272
+      ],
+      "id": "7a7ebe8a-390a-40fe-a1e4-3c2d16d3f113",
+      "name": "Data Preparation"
+    },
+    {
+      "parameters": {
+        "url": "https://api.quickcommerceapi.com/v1/groupsearch",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.vegetable }}"
+            },
+            {
+              "name": "lat",
+              "value": "={{Number($json.lat)}}"
+            },
+            {
+              "name": "lon",
+              "value": "={{Number($json.lon)}}"
+            },
+            {
+              "name": "platforms",
+              "value": "BlinkIt,Zepto,Swiggy,BigBasket"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        736,
+        144
+      ],
+      "id": "f906ae67-ef08-4544-a2fe-a326407289bb",
+      "name": "External API Call",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        944,
+        272
+      ],
+      "id": "4deb24cb-c0a9-426b-9ead-9c01005c3597",
+      "name": "Data Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log($json);\n\nconst results = $json.data.results;\nconst veg = ($json.vegetable || \"\").trim().toLowerCase();\nconst targetQty = Number($json.quantity || 500);\n\nif (!veg) throw new Error(\"Vegetable missing\");\n\nconst junkWords = [\n  \"chips\",\"stix\",\"sticks\",\"nachos\",\"snack\",\"mix\",\"masala\",\n  \"fry\",\"frozen\",\"ready\",\"cutlet\",\"soup\",\"powder\",\"paste\",\n  \"sauce\",\"pickle\",\"namkeen\",\"bhujia\", \"sweet\", \"Ooty\",\n\"cream\",\"crackers\",\"biscuit\",\"flavour\",\"flavored\",\"combo\",\"cheese\",\"bites\",\"baby\",\"sambar\",\"white\",\"shots\",\"ketchup\",\"Tomato Ketchup\"\n];\n\nlet final = [];\n\nfor (const platform in results) {\n\n  if (!Array.isArray(results[platform])) continue;\n\n  results[platform].forEach(item => {\n\n    if (!item.name || item.available !== true) return;\n\n    const name = item.name.toLowerCase();\n    \n    const regex = new RegExp(`\\\\b${veg}\\\\b`);\n    if (!regex.test(name)) return;\n    \n    const cookedWords = [\n      \"paratha\",\"roti\",\"sabzi\",\"curry\",\"gravy\",\"masala\",\n      \"chips\",\"snack\",\"mix\",\"bhujia\",\"namkeen\",\n      \"soup\",\"paste\",\"powder\",\"pickle\",\"fry\",\"cutlet\",\n      \"stix\",\"sticks\",\"crackers\",\"biscuits\"\n    ];\n    \n    if (cookedWords.some(word => name.includes(word))) return;\n    \n    if (name.includes(\"&\") || name.includes(\"flavour\") || name.includes(\"flavored\")) return;\n    \n    if (name.split(\" \").length > 4) return;\n\n    if (!item.quantity) return;\n    \n    const qty = item.quantity.toLowerCase();\n    \n    const price = Number(item.offer_price || item.mrp || 0);\n    \n    let weight = 0;\n    if (qty.includes(\"kg\")) {\n      weight = parseFloat(qty) * 1000;\n    } else if (qty.includes(\"g\")) {\n      weight = parseFloat(qty);\n    }\n\n    const pricePerKg = weight ? (price / weight) * 1000 : price;\n        \n    let score = 0;\n    if (name.startsWith(veg)) score += 5;\n    if (name.includes(\" \" + veg + \" \")) score += 3;\n    if (name.split(\" \").length <= 3) score += 2;\n    if (junkWords.some(word => name.includes(word))) score -= 5;\n    if (name.includes(\"&\")) score -= 3;\n    if (name.split(\" \").length > 6) score -= 3;\n    if (!item.quantity) score -= 2;\n    if (\n      item.quantity &&\n      !item.quantity.toLowerCase().includes(\"g\") &&\n      !item.quantity.toLowerCase().includes(\"kg\")\n    ) score -= 3;\n\n    const lower = targetQty * 0.8;\n    const upper = targetQty * 1.2;\n    \n    const deviation = Math.abs(weight - targetQty) / targetQty;\n\n    if (deviation > 0.5) score -= 5;   \n    else if (deviation > 0.2) score -= 2; \n\n    if (score < 2) return;\n    final.push({\n    app: platform,\n    name: item.name,\n    price,\n    unit: item.quantity || \"N/A\",\n    link: item.deeplink || \"#\",\n    score,\n    pricePerKg\n});\n\n  });\n}\n\n  final.sort((a, b) => {\n  if (b.score !== a.score) return b.score - a.score;\n  return a.pricePerKg - b.pricePerKg;\n});\n\n// remove score before returning\nconst top5 = final.slice(0, 5).map((item, i) => ({\n  app: item.app,\n  name: item.name,\n  price: item.price,\n  unit: item.unit,\n  link: item.link,\n  price_per_kg: Math.round(item.pricePerKg),\n  best: i === 0\n}));\n\nreturn top5.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        272
+      ],
+      "id": "570dece0-312e-4197-9bd9-d28de8f8c5f2",
+      "name": "Logic Processing",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "content": "## Webhook\nReceives input from the user. Acts as the trigger for workflow execution",
+        "height": 128,
+        "width": 176
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        96,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "73637f87-1569-421c-b8b7-4368dac311dd",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## AI Processing\nIdentifies and extracts relevant information from input. Converts raw input into usable data",
+        "height": 144,
+        "width": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        432
+      ],
+      "typeVersion": 1,
+      "id": "69f63679-6de7-4e2e-a121-cd9b8296f0b5",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Data Preparation\nCleans and structures the extracted data. Prepares it for API consumption",
+        "height": 144,
+        "width": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        416,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "812bbb89-de29-43fb-97b6-01e19cb92c00",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## External API Call\nFetches relevant data from external service. Uses processed input to retrieve results",
+        "height": 144,
+        "width": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        368
+      ],
+      "typeVersion": 1,
+      "id": "6faef702-3601-45d3-b4a7-bb6ab56bbb1a",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Data Merge\nCombines AI output and API response. Creates a unified dataset for further processing",
+        "height": 144,
+        "width": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        912,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "2d90edaa-ff15-4bd8-b55d-2672f26a5d7c",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Logic Processing\nApplies custom logic and transformations and Formats final output",
+        "height": 128,
+        "width": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1072,
+        432
+      ],
+      "typeVersion": 1,
+      "id": "280fdcda-47a2-46ba-b912-d9eebad56fb2",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Response\nSends processed result back to user. Completes the workflow",
+        "height": 144,
+        "width": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "dba9a56a-8d95-4693-9b8a-43f1776a2c53",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (Entry Point)": {
+      "main": [
+        [
+          {
+            "node": "AI Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Processing": {
+      "main": [
+        [
+          {
+            "node": "Data Preparation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Preparation": {
+      "main": [
+        [
+          {
+            "node": "Data Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "External API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "External API Call": {
+      "main": [
+        [
+          {
+            "node": "Data Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Merge": {
+      "main": [
+        [
+          {
+            "node": "Logic Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logic Processing": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6228d268-ea7d-4097-b6fa-2fa181b04844",
+  "meta": {
+    "instanceId": "5db5a2c03847c028ab2af1482c363fe66121d0260aaf4bbc8870f799291735b2"
+  },
+  "id": "XjuTWiJBL2cXJnmC",
+  "tags": []
+}
